@@ -8,10 +8,11 @@ use std::cmp::{Ordering, min, max};
 
 use time::{SteadyTime, Duration};
 
+use pulse::{Signal, Pulse};
+
 struct ScheduledEvent {
     when: SteadyTime,
-    completion_sink: Sender<()>,
-    period: Option<u32>,
+    completion_sink: Pulse,
 }
 impl Ord for ScheduledEvent {
     fn cmp(&self, other: &ScheduledEvent) -> Ordering {
@@ -35,8 +36,7 @@ impl PartialOrd for ScheduledEvent {
 
 struct SchedulingRequest {
     duration: u32,
-    periodic: bool,
-    completion_sink: Sender<()>,
+    completion_sink: Pulse,
 }
 
 struct SchedulingInterface {
@@ -63,7 +63,6 @@ impl ScheduleWorker {
         while let Ok(request) = self.request_source.try_recv() {
             self.schedule.push(ScheduledEvent{
                 when: SteadyTime::now() + Duration::milliseconds(request.duration as i64),
-                period: if request.periodic { Some(request.duration) } else { None },
                 completion_sink: request.completion_sink
             });
         }
@@ -79,20 +78,7 @@ impl ScheduleWorker {
 
     fn fire_event(&mut self) {
         if let Some(evt) = self.schedule.pop() {
-            match evt.completion_sink.send( () ) {
-                Ok( () ) => {
-                    if let Some(period) = evt.period.clone() {
-                        self.schedule.push(ScheduledEvent{
-                            when: evt.when + Duration::milliseconds(period as i64),
-                            period: evt.period,
-                            completion_sink: evt.completion_sink,
-                        });
-                    }
-                }
-                Err(_) => {
-                    // The receiver is no longer waiting for us
-                }
-            }
+            evt.completion_sink.pulse();
         }
     }
 
@@ -147,14 +133,13 @@ lazy_static! {
     };
 }
 
-fn add_request(duration_ms: u32, periodic: bool) -> Receiver<()> {
-    let (sender, receiver) = channel();
+fn add_request(duration_ms: u32) -> Signal {
+    let (receiver, sender) = Signal::new();
 
     let interface = SCHEDULER_INTERFACE.lock().ok().expect("Failed to acquire the global scheduling worker");
     interface.adder.send(SchedulingRequest{
         duration:duration_ms,
         completion_sink:sender,
-        periodic: periodic
     }).ok().expect("Failed to send a request to the global scheduling worker");
 
     interface.trigger.notify_one();
@@ -164,12 +149,6 @@ fn add_request(duration_ms: u32, periodic: bool) -> Receiver<()> {
 
 /// Starts a timer which after `ms` milliseconds will issue a **single** `.send(())` on the other side of the
 /// returned `Reciever<()>`.
-pub fn oneshot_ms(ms: u32) -> Receiver<()> {
-    add_request(ms, false)
-}
-
-/// Starts a timer which, **every** `ms` milliseconds, will issue `.send(())` on the other side of the
-/// returned `Reciever<()>`.
-pub fn periodic_ms(ms: u32) -> Receiver<()> {
-    add_request(ms, true)
+pub fn oneshot_ms(ms: u32) -> Signal {
+    add_request(ms)
 }

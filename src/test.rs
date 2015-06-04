@@ -1,5 +1,5 @@
 
-use scheduler::{oneshot_ms, periodic_ms};
+use scheduler::oneshot_ms;
 use time::SteadyTime;
 
 struct ElapsedChecker {
@@ -24,7 +24,7 @@ impl ElapsedChecker {
 fn simple_wait() {
     let checker = ElapsedChecker::new();
     let timer = oneshot_ms(1400);
-    timer.recv().unwrap();
+    timer.wait().unwrap();
     checker.check(1400);
 }
 
@@ -34,13 +34,13 @@ fn several_concurrent_waits() {
     let medium = oneshot_ms(1400);
     let short = oneshot_ms(300);
     let long = oneshot_ms(2000);
-    short.recv().unwrap();
+    short.wait().unwrap();
     checker.check(300);
 
-    medium.recv().unwrap();
+    medium.wait().unwrap();
     checker.check(1400);
 
-    long.recv().unwrap();
+    long.wait().unwrap();
     checker.check(2000);
 }
 
@@ -53,24 +53,12 @@ fn several_concurrent_waits_misordered() {
 
     // We wait for the last timer before we check the others,
     // so they should all recv immediately after the first one.
-    long.recv().unwrap();
+    long.wait().unwrap();
     checker.check(2000);
 
-    short.recv().unwrap();
+    short.wait().unwrap();
     checker.check(2000);
 
-    medium.recv().unwrap();
+    medium.wait().unwrap();
     checker.check(2000);
-}
-
-
-#[test]
-fn simple_periodic() {
-    let checker = ElapsedChecker::new();
-    let p = periodic_ms(200);
-
-    for i in (1..10) {
-        p.recv().unwrap();
-        checker.check(i*200);
-    }
 }

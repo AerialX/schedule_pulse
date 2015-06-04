@@ -1,5 +1,5 @@
 [package]
-name = "schedule_recv"
+name = "schedule_pulse"
 version = "0.0.1"
 authors = [
   "Peter Reid <peter.d.reid@gmail.com>",
@@ -16,5 +16,6 @@ documentation = "https://PeterReid.github.io/schedule_recv"
 keywords = ["schedule_recv", "timer"]
 
 [dependencies]
-lazy_static = "*"
-time = "*"
+lazy_static = "0.1"
+time = "0.1"
+pulse = "0.5"
