@@ -84,9 +84,9 @@ impl ScheduleWorker {
 
     fn ms_until_next_event(&self) -> u32 {
         if let Some(evt) = self.schedule.peek() {
-            max(0, min((evt.when - SteadyTime::now()).num_milliseconds(), 100000))  as u32
+            max(25, min((evt.when - SteadyTime::now()).num_milliseconds() - 4000, 10000))  as u32
         } else {
-            100000
+            1000
         }
     }
 
@@ -142,7 +142,7 @@ fn add_request(duration_ms: u32) -> Signal {
         completion_sink:sender,
     }).ok().expect("Failed to send a request to the global scheduling worker");
 
-    interface.trigger.notify_one();
+    interface.trigger.notify_all();
 
     receiver
 }
